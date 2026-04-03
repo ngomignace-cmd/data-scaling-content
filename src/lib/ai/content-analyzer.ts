@@ -1,5 +1,6 @@
 import { ChatAnthropic } from "@langchain/anthropic";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
+import { ANALYZER_PROMPT } from "./prompts/setter-system";
 import type { PatternInsight } from "@/types/analytics";
 import type { Post } from "@/types/content";
 
@@ -11,12 +12,17 @@ function getClaude() {
   });
 }
 
+export interface EnrichedPatternInsight extends PatternInsight {
+  recommendation?: string;
+}
+
 /**
- * Analyse les patterns de performance de contenu
+ * Analyse les patterns de performance de contenu avec Claude.
+ * Utilise le ANALYZER_PROMPT pour une analyse orientée conversion (pas juste engagement).
  */
 export async function analyzeContentPatterns(
   posts: Post[]
-): Promise<PatternInsight[]> {
+): Promise<EnrichedPatternInsight[]> {
   if (posts.length === 0) return [];
 
   const postSummaries = posts.map((p) => ({
@@ -26,19 +32,14 @@ export async function analyzeContentPatterns(
     reach: p.reach,
     engagement_rate: p.engagement_rate,
     leads_generated: p.leads_generated,
+    saves: p.saves,
+    shares: p.shares,
     tags: p.tags,
+    published_at: p.published_at,
   }));
 
   const response = await getClaude().invoke([
-    new SystemMessage(`Tu es un analyste marketing expert en contenu Instagram.
-Analyse les données de performance des posts et identifie des patterns actionnables.
-
-Réponds en JSON valide : un tableau d'objets avec :
-- "type": catégorie du pattern (format_impact, timing_impact, topic_impact, engagement_pattern)
-- "insight": description claire et actionnable en français (1 phrase)
-- "confidence": score de confiance entre 0 et 1
-
-Maximum 5 patterns. Ne retourne QUE le JSON, sans markdown.`),
+    new SystemMessage(ANALYZER_PROMPT),
     new HumanMessage(JSON.stringify(postSummaries)),
   ]);
 
@@ -47,7 +48,7 @@ Maximum 5 patterns. Ne retourne QUE le JSON, sans markdown.`),
     : String(response.content);
 
   try {
-    return JSON.parse(content) as PatternInsight[];
+    return JSON.parse(content) as EnrichedPatternInsight[];
   } catch {
     return [
       {
