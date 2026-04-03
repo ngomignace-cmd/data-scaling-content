@@ -9,7 +9,7 @@ function getModel() {
   return new ChatOpenAI({
     modelName: "gpt-4o",
     temperature: 0.1,
-    maxTokens: 500,
+    maxTokens: 800,
   });
 }
 
